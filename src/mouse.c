@@ -3,34 +3,8 @@
 // #include <zgdk.h>
 #include "controller.h"
 
-#define LEFT1     (input1 & BUTTON_LEFT)
-#define RIGHT1    (input1 & BUTTON_RIGHT)
-#define UP1       (input1 & BUTTON_UP)
-#define DOWN1     (input1 & BUTTON_DOWN)
-#define BUTTON1_B (input1 & BUTTON_B)
-#define BUTTON1_A (input1 & BUTTON_A)
-#define BUTTON1_X (input1 & BUTTON_X)
-#define BUTTON1_Y (input1 & BUTTON_Y)
-#define BUTTON1_L (input1 & BUTTON_L)
-#define BUTTON1_R (input1 & BUTTON_R)
-#define START1    (input1 & BUTTON_START)
-#define SELECT1   (input1 & BUTTON_SELECT)
-
-
-#define LEFT2     (input2 & BUTTON_LEFT)
-#define RIGHT2    (input2 & BUTTON_RIGHT)
-#define UP2       (input2 & BUTTON_UP)
-#define DOWN2     (input2 & BUTTON_DOWN)
-#define BUTTON2_B (input2 & BUTTON_B)
-#define BUTTON2_A (input2 & BUTTON_A)
-#define BUTTON2_X (input2 & BUTTON_X)
-#define BUTTON2_Y (input2 & BUTTON_Y)
-#define BUTTON2_L (input2 & BUTTON_L)
-#define BUTTON2_R (input2 & BUTTON_R)
-#define START2    (input2 & BUTTON_START)
-#define SELECT2   (input2 & BUTTON_SELECT)
-
-void deinit(void) {
+void deinit(void)
+{
     // do nothing
 }
 
@@ -45,45 +19,68 @@ void handle_error(zos_err_t err, const char* message, uint8_t fatal)
     }
 }
 
-int main(void) {
+int main(void)
+{
     zos_err_t err;
 
     printf("snes mouse test\n");
 
     err = controller_init();
     handle_error(err, "failed to init controller 1", 1);
+
     err = controller_flush();
     handle_error(err, "failed to flush controller 1", 1);
 
-    uint8_t mousePort = 0;
-    if(controller_is(1, SNES_MOUSE)) {
-        printf("SNES Mouse Detected: %d\n", 1);
-        mousePort = 1;
+
+    uint8_t mousePort = 0xFF;
+
+    if (controller_is(SNES_PORT1, SNES_MOUSE)) {
+        printf("SNES Mouse Detected: %d\n", SNES_PORT1);
+        mousePort = SNES_PORT1;
     }
-    if(controller_is(2, SNES_MOUSE)) {
-        printf("SNES Mouse Detected: %d\n", 2);
-        mousePort = 2;
+
+    if (controller_is(SNES_PORT2, SNES_MOUSE)) {
+        printf("SNES Mouse Detected: %d\n", SNES_PORT2);
+        mousePort = SNES_PORT2;
     }
 
     uint16_t input1 = 0, input2 = 0;
-    uint32_t mouse = 0, prev_mouse = 0;
+    uint8_t mouse = 0, prev_mouse = 0;
     uint16_t prev_input1 = 0, prev_input2 = 0;
-    while(1) {
-        if(mousePort != 1) input1 = controller_read_port(1);
-        if(mousePort != 2) input2 = controller_read_port(2);
-        if(mousePort) mouse = controller_read_mouse(mousePort);
+    uint8_t right = 0, left  = 0, speed = 0;
+    int8_t y = 0, x = 0;
 
-        // no input
-        // if(!input1 && !input2 && !mouse) continue;
+    // overflows the int8 and makes it 16-bit?
+    // for(uint8_t i = 0; i < 8; i++) {
+    //     y = y << 1;
+    //     y |= 1;
+    // }
+    // for(uint8_t i = 0; i < 8; i++) {
+    //     x = x << 1;
+    //     x |= 1;
+    // }
 
-        // input hasn't changed
-        // if(
-        //     (input1 == prev_input1)
-        //     && (input2 == prev_input2)
-        //     && (mouse == prev_mouse)
-        // ) continue;
+    printf(" test: %02x %02x %02x %04x ",
+        mouse, // %02x
+        y,     // %02x
+        x,     // %02x
+        input2          // %04x
+    );
+    printf("L: %03d R: %03d Y: %04d X: %04d \n",
+        left,           // %03d
+        right,          // %03d
+        // speed,          // %03d
+        y,
+        x
+    );
 
-        if(input1 != prev_input1) {
+    while (1) {
+        controller_read();
+        if (mousePort != 0xFF) mouse = controller_read_mouse(mousePort);
+        input1 = controller_get(SNES_PORT1);
+        input2 = controller_get(SNES_PORT2);
+
+        if ((mousePort != SNES_PORT1) && (input1 != prev_input1)) {
             printf("P1: %04x ", input1);
             if(LEFT1) printf("Left ");
             if(RIGHT1) printf("Right ");
@@ -100,7 +97,7 @@ int main(void) {
             printf("\n");
         }
 
-        if(input2 != prev_input2) {
+        if ((mousePort != SNES_PORT2) && (input2 != prev_input2)) {
             printf("P2: %04x ", input2);
             if(LEFT2) printf("Left ");
             if(RIGHT2) printf("Right ");
@@ -117,30 +114,35 @@ int main(void) {
             printf("\n");
         }
 
-        if(mouse != prev_mouse) {
-            uint8_t right = ((mouse >> 8) & 0x1);
-            uint8_t left = (mouse >> 9) & 0x1;
-            uint8_t speed = (mouse >> 10) & 0xC;
-            uint8_t y = (mouse >> 16) & 0xFF;
-            uint8_t x = (mouse >> 24) & 0xFF;
-            printf("mouse: %02x %02x %02x %02x L: %d R: %d S: %d X: %d Y: %d\n",
-                (mouse >> 24) & 0xFF,
-                (mouse >> 16) & 0xFF,
-                (mouse >> 8) & 0xFF,
-                (mouse >> 0) & 0xFF,
-                left,
-                right,
-                speed,
-                x,
-                y
+        if (mouse != prev_mouse || input2 != prev_input2) {
+            right = (MOUSE2_R != 0);
+            left  = (MOUSE2_L != 0);
+            // speed = MOUSE2_SPD;
+            y = controller_get_mousey();
+            x = controller_get_mousex();
+            printf("mouse: %02x %02x %02x %04x ",
+                mouse, // %02x
+                y,     // %02x
+                x,     // %02x
+                input2          // %04x
+            );
+            printf("L: %03d R: %03d Y: %04d X: %04d \n",
+                left,           // %03d
+                right,          // %03d
+                // speed,          // %03d
+                y,
+                x
             );
         }
 
-        if(START1) break;
+        if ((mousePort != 0xFF) && START1)
+            break;
+        if ((mousePort != 0xFF) && START2)
+            break;
 
         prev_input1 = input1;
         prev_input2 = input2;
-        prev_mouse = mouse;
+        prev_mouse  = mouse;
     }
 
     return 0;

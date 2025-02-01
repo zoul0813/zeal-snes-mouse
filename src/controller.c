@@ -8,7 +8,8 @@
 #include <zos_errors.h>
 #include <zos_time.h>
 #include <zos_keyboard.h>
-#include "input/controller.h"
+// #include "input/controller.h"
+#include "controller.h"
 
 /**
  * @brief Define some variables to access the PIO from C code
@@ -31,18 +32,17 @@ __sfr __at(0xd2) IO_PIO_CTRL_A;
 #define IO_LATCH 2
 #define IO_CLOCK 3
 
-#define PAD_1   0x8000
-#define MOUSE_1 0x80000000
-
-uint16_t CONTROLLER1_bits = 0; // nothing
-uint16_t CONTROLLER2_bits = 0; // nothing
-uint32_t MOUSE_bits       = 0; // nothing
+uint16_t PORT1_bits = 0; // nothing
+uint16_t PORT2_bits = 0; // nothing
+int8_t MOUSE_y = 0; // nothing
+int8_t MOUSE_x = 0; // nothing
 
 zos_err_t controller_flush(void)
 {
-    CONTROLLER1_bits = 0;
-    CONTROLLER2_bits = 0;
-    MOUSE_bits       = 0;
+    PORT1_bits   = 0;
+    PORT2_bits   = 0;
+    MOUSE_y = 0;
+    MOUSE_x = 0;
 
     return ERR_SUCCESS;
 }
@@ -73,12 +73,9 @@ zos_err_t controller_init(void)
     return ERR_SUCCESS;
 }
 
-/**
- * @brief Read the controller state
- */
 uint16_t controller_read(void)
 {
-    return controller_read_port(1);
+    return controller_read_port(SNES_PORT1);
 }
 
 uint16_t controller_read_port(uint8_t port)
@@ -91,67 +88,69 @@ uint16_t controller_read_port(uint8_t port)
     IO_PIO_DATA_A = 1 << IO_CLOCK;
     // Now, the DATA lines contain the first button (B) state.
 
-    CONTROLLER1_bits = GET_DATA(IO_DATA1) == 0 ? PAD_1 : 0;
-    CONTROLLER2_bits = GET_DATA(IO_DATA2) == 0 ? PAD_1 : 0;
+    PORT1_bits = GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0;
+    PORT2_bits = GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0;
     // process the remaining 1 buttons (last 4 are unused)
     for (uint8_t i = 0; i < 15; ++i) {
-        CONTROLLER1_bits = CONTROLLER1_bits >> 1;
-        CONTROLLER2_bits = CONTROLLER2_bits >> 1;
-        CLOCK_ONCE();                                             // pulse the clock
-        CONTROLLER1_bits |= GET_DATA(IO_DATA1) == 0 ? PAD_1 : 0; // OR the current button
-        CONTROLLER2_bits |= GET_DATA(IO_DATA2) == 0 ? PAD_1 : 0; // OR the current button
+        PORT1_bits = PORT1_bits >> 1;
+        PORT2_bits = PORT2_bits >> 1;
+        CLOCK_ONCE();                                  // pulse the clock
+        PORT1_bits |= GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0; // OR the current button
+        PORT2_bits |= GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0; // OR the current button
     }
 
     switch (port) {
-        case 1: return CONTROLLER1_bits;
-        case 2: return CONTROLLER2_bits;
+        case SNES_PORT1: return PORT1_bits;
+        case SNES_PORT2: return PORT2_bits;
     }
     return 0;
 }
 
-uint16_t controller_read_mouse(uint8_t port)
+uint8_t controller_read_mouse(uint8_t port)
 {
-    (void)port; // unreferenced
+    (void) port; // unreferenced
 
-    /**
-     * Generate a pulse on the LATCH pin, CLOCK must remain high during this process
-     * Thanks to the preconfigured registers, this takes 24 T-States (2.4 microseconds @ 10MHz)
-     */
-    IO_PIO_DATA_A = 1 << IO_CLOCK | 1 << IO_LATCH;
-    IO_PIO_DATA_A = 1 << IO_CLOCK;
-    // Now, the DATA lines contain the first button (B) state.
+    // // small delay, to ensure proper read
+    // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
+    // __asm__("nop\n" // 4 cycles
+    //         "nop\n" // 4 cycles
+    //         "nop\n" // 4 cycles
+    //         "nop\n" // 4 cycles
+    // );
 
-    uint8_t i;
-    // ignore first byte
-    for(i = 0; i < 7; i++) {
+    // third (Y) byte
+    CLOCK_ONCE();
+    MOUSE_y = GET_DATA(port) == 0 ? 1 : 0;
+    for (uint8_t i = 0; i < 7; ++i) {
+        MOUSE_y = MOUSE_y << 1;
         CLOCK_ONCE();
+        MOUSE_y |= GET_DATA(port) == 0 ? 1 : 0;
     }
 
-    // second byte (R, L, Speed, ID)
-    for (uint8_t i = 0; i < 8; ++i) {
-        MOUSE_bits = MOUSE_bits >> 1;
-        CLOCK_ONCE();                                             // pulse the clock
-        MOUSE_bits |= GET_DATA(IO_DATA2) == 0 ? MOUSE_1 : 0; // OR the current button
-    }
-    __asm__(
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-        "nop\n" // 4 cycles
-    );
-
-    // third (Y) and fourth (X) byte
-    for (uint8_t i = 0; i < 16; ++i) {
-        MOUSE_bits = MOUSE_bits >> 1;
-        CLOCK_ONCE();                                             // pulse the clock
-        MOUSE_bits |= GET_DATA(IO_DATA2) == 0 ? MOUSE_1 : 0; // OR the current button
+    // fourth (X) byte
+    CLOCK_ONCE();
+    MOUSE_x = GET_DATA(port) == 0 ? 1 : 0;
+    for (uint8_t i = 0; i < 7; ++i) {
+        MOUSE_x = MOUSE_x << 1;
+        CLOCK_ONCE();
+        MOUSE_x |= GET_DATA(port) == 0 ? 1 : 0;
     }
 
-    return MOUSE_bits;
+    if (MOUSE_x != 0 && MOUSE_y != 0)
+        return 0x03;
+    if (MOUSE_y != 0)
+        return 0x01;
+    if (MOUSE_x != 0)
+        return 0x02;
+    return 0;
+}
+
+int8_t controller_get_mousey(void) {
+    return MOUSE_y;
+}
+
+int8_t controller_get_mousex(void) {
+    return MOUSE_x;
 }
 
 uint8_t controller_is(uint8_t port, ControllerType type)
@@ -164,4 +163,13 @@ uint8_t controller_is(uint8_t port, ControllerType type)
         case SNES_MOUSE: return (bits & 0xF000) == MOUSE_ID;
         default: return 0;
     }
+}
+
+uint16_t controller_get(uint8_t port)
+{
+    switch (port) {
+        case SNES_PORT1: return PORT1_bits;
+        case SNES_PORT2: return PORT2_bits;
+    }
+    return 0;
 }
