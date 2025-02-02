@@ -163,13 +163,12 @@ uint8_t controller_is(uint8_t port, ControllerType type)
      // SNES should report 0xFFFF
      // Hyperkin shoudl report 0x8000
     uint8_t mouse_type = controller_read_mouse(port);
-    uint8_t x = controller_get_mousex();
-    uint8_t y = controller_get_mousey();
+    uint8_t brand = controller_get_mousey();
 
-    printf("controller_is(%d, %d): %04x Brand: %02x%02x \"", port, type, bits, y, x);
-    if(y == 0xFF) {
+    printf("controller_is(%d, %d): %04x Brand: %02x \"", port, type, bits, brand);
+    if(brand == 0xFF) {
         printf("Nintendo");
-    } else if(y == 0x80) {
+    } else if(brand == 0x80) {
         printf("Hyperkin");
     } else {
         printf("UNKNOWN");
