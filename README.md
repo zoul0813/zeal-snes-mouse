@@ -5,3 +5,4 @@
 * [Fullsnes - Nocash SNES Specs](https://problemkaputt.de/fullsnes.htm#snescontrollersmousetwobuttonmouse)
 * [Super Nintendo Entertainment System: pinouts & protocol](https://www.repairfaq.org/REPAIR/F_SNES.html#SNES_007)
 * [SNES mouse on a PC](https://www.raphnet.net/electronique/snesmouse/index_en.php)
+* [Super NES Controller Data](https://gamesx.com/controldata/snesdat.htm)
