@@ -39,6 +39,8 @@ int8_t MOUSE_x = 0; // nothing
 
 zos_err_t controller_flush(void)
 {
+    controller_read_port(SNES_PORT1);
+
     PORT1_bits   = 0;
     PORT2_bits   = 0;
     MOUSE_y = 0;
@@ -84,8 +86,9 @@ uint16_t controller_read_port(uint8_t port)
      * Generate a pulse on the LATCH pin, CLOCK must remain high during this process
      * Thanks to the preconfigured registers, this takes 24 T-States (2.4 microseconds @ 10MHz)
      */
-    IO_PIO_DATA_A = 1 << IO_CLOCK | 1 << IO_LATCH;
-    IO_PIO_DATA_A = 1 << IO_CLOCK;
+    IO_PIO_DATA_A = 1 << IO_LATCH;
+    IO_PIO_DATA_A = 0;
+    // IO_PIO_DATA_A = 1 << IO_CLOCK;
     // Now, the DATA lines contain the first button (B) state.
 
     PORT1_bits = GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0;
@@ -119,22 +122,21 @@ uint8_t controller_read_mouse(uint8_t port)
     // );
 
     // third (Y) byte
-    CLOCK_ONCE();
-    MOUSE_y = GET_DATA(port) == 0 ? 1 : 0;
-    for (uint8_t i = 0; i < 7; ++i) {
+    for (uint8_t i = 0; i < 8; ++i) {
         MOUSE_y = MOUSE_y << 1;
         CLOCK_ONCE();
         MOUSE_y |= GET_DATA(port) == 0 ? 1 : 0;
     }
+    if(MOUSE_y & 0x80) MOUSE_y = -(MOUSE_y & 0x7F);
+
 
     // fourth (X) byte
-    CLOCK_ONCE();
-    MOUSE_x = GET_DATA(port) == 0 ? 1 : 0;
-    for (uint8_t i = 0; i < 7; ++i) {
+    for (uint8_t i = 0; i < 8; ++i) {
         MOUSE_x = MOUSE_x << 1;
         CLOCK_ONCE();
         MOUSE_x |= GET_DATA(port) == 0 ? 1 : 0;
     }
+    if(MOUSE_x & 0x80) MOUSE_x = -(MOUSE_x & 0x7F);
 
     if (MOUSE_x != 0 && MOUSE_y != 0)
         return 0x03;
@@ -156,7 +158,23 @@ int8_t controller_get_mousex(void) {
 uint8_t controller_is(uint8_t port, ControllerType type)
 {
     uint16_t bits = controller_read_port(port);
-    printf("controller_is(%d, %d): %04x\n", port, type, bits);
+    controller_read_mouse(port); // read and discard the X/Y
+     // second read, to get bytes 5-6
+     // SNES should report 0xFFFF
+     // Hyperkin shoudl report 0x8000
+    uint8_t mouse_type = controller_read_mouse(port);
+    uint8_t x = controller_get_mousex();
+    uint8_t y = controller_get_mousey();
+
+    printf("controller_is(%d, %d): %04x Brand: %02x%02x \"", port, type, bits, y, x);
+    if(y == 0xFF) {
+        printf("Nintendo");
+    } else if(y == 0x80) {
+        printf("Hyperkin");
+    } else {
+        printf("UNKNOWN");
+    }
+    printf("\"\n");
 
     switch (type) {
         case SNES_PAD: return (bits & 0xF000) == 0;

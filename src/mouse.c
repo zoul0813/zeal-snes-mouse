@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <zos_sys.h>
+#include <zos_vfs.h>
+#include <zos_video.h>
+#include <zvb_gfx.h>
 // #include <zgdk.h>
 #include "controller.h"
+
+int paint(void);
 
 void deinit(void)
 {
@@ -45,36 +50,16 @@ int main(void)
     }
 
     uint16_t input1 = 0, input2 = 0;
-    uint8_t mouse = 0, prev_mouse = 0;
     uint16_t prev_input1 = 0, prev_input2 = 0;
+    uint8_t mouse = 0, prev_mouse = 0;
     uint8_t right = 0, left  = 0, speed = 0;
     int8_t y = 0, x = 0;
 
-    // overflows the int8 and makes it 16-bit?
-    // for(uint8_t i = 0; i < 8; i++) {
-    //     y = y << 1;
-    //     y |= 1;
-    // }
-    // for(uint8_t i = 0; i < 8; i++) {
-    //     x = x << 1;
-    //     x |= 1;
-    // }
-
-    printf(" test: %02x %02x %02x %04x ",
-        mouse, // %02x
-        y,     // %02x
-        x,     // %02x
-        input2          // %04x
-    );
-    printf("L: %03d R: %03d Y: %04d X: %04d \n",
-        left,           // %03d
-        right,          // %03d
-        // speed,          // %03d
-        y,
-        x
-    );
-
     while (1) {
+        // wait on vblank to simulate actual read speed for "distance"
+        gfx_wait_vblank(NULL);
+        gfx_wait_end_vblank(NULL);
+
         controller_read();
         if (mousePort != 0xFF) mouse = controller_read_mouse(mousePort);
         input1 = controller_get(SNES_PORT1);
@@ -114,16 +99,16 @@ int main(void)
             printf("\n");
         }
 
-        if (mouse != prev_mouse || input2 != prev_input2) {
+        if ((mousePort != 0xFF) && ((mouse != prev_mouse) || (input2 != prev_input2))) {
             right = (MOUSE2_R != 0);
             left  = (MOUSE2_L != 0);
             // speed = MOUSE2_SPD;
             y = controller_get_mousey();
             x = controller_get_mousex();
             printf("mouse: %02x %02x %02x %04x ",
-                mouse, // %02x
-                y,     // %02x
-                x,     // %02x
+                mouse & 0xFF, // %02x
+                y & 0xFF,     // %02x
+                x & 0xFF,     // %02x
                 input2          // %04x
             );
             printf("L: %03d R: %03d Y: %04d X: %04d \n",
@@ -135,15 +120,23 @@ int main(void)
             );
         }
 
-        if ((mousePort != 0xFF) && START1)
-            break;
-        if ((mousePort != 0xFF) && START2)
-            break;
+        if ((mousePort != SNES_PORT1)) {
+            if(START1) goto exit_program;
+            if(BUTTON1_Y) {
+                paint();
+                ioctl(DEV_STDOUT, CMD_RESET_SCREEN, NULL);
+                controller_flush();
+            }
+        }
+        if ((mousePort == SNES_PORT1)) {
+            if(START2) goto exit_program;
+        }
 
         prev_input1 = input1;
         prev_input2 = input2;
         prev_mouse  = mouse;
     }
 
+exit_program:
     return 0;
 }
