@@ -61,7 +61,9 @@ int main(void)
         gfx_wait_end_vblank(NULL);
 
         controller_read();
-        if (mousePort != 0xFF) mouse = controller_read_mouse(mousePort);
+        if (mousePort != 0xFF) {
+            mouse = controller_read_mouse(mousePort);
+        }
         input1 = controller_get(SNES_PORT1);
         input2 = controller_get(SNES_PORT2);
 

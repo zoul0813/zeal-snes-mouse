@@ -136,7 +136,7 @@ int paint(void)
         if (mx < 0) {
             uint8_t diff = 1; //-pak[1];
             x -= diff;
-        } else {
+        } else if(mx > 0) {
             x += 1; // pak[1];
         }
 
@@ -149,7 +149,7 @@ int paint(void)
         if (my < 0) {
             uint8_t diff = 1; //-pak[2];
             y += diff;
-        } else {
+        } else if(my > 0) {
             y -= 1; // pak[2];
         }
 
