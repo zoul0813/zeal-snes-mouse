@@ -133,11 +133,11 @@ int paint(void)
         prev_input1 = input1;
         prev_input2 = input2;
 
+        uint8_t diff = (mx & 0x7F) >> 4; // 1; //-pak[1];
         if (mx < 0) {
-            uint8_t diff = 1; //-pak[1];
             x -= diff;
         } else if(mx > 0) {
-            x += 1; // pak[1];
+            x += diff; // pak[1];
         }
 
         if (x <= 0) {
@@ -146,11 +146,11 @@ int paint(void)
             x = SCREEN_WIDTH - 16;
         }
 
+        diff = (my & 0x7F) >> 4; // 1; //-pak[2];
         if (my < 0) {
-            uint8_t diff = 1; //-pak[2];
-            y += diff;
+            y -= diff; // pak[2];
         } else if(my > 0) {
-            y -= 1; // pak[2];
+            y += diff;
         }
 
         if (y <= 0) {

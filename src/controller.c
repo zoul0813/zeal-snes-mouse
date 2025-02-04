@@ -17,11 +17,32 @@
 __sfr __at(0xd0) IO_PIO_DATA_A;
 __sfr __at(0xd2) IO_PIO_CTRL_A;
 
+/**
+ * Generate a pulse on the LATCH pin, CLOCK must remain high during this process
+ * Thanks to the preconfigured registers, this takes 24 T-States (2.4 microseconds @ 10MHz)
+ */
+#define LATCH_ONCE()                                       \
+    do {                                                   \
+        IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH); \
+        IO_PIO_DATA_A = (1 << IO_CLOCK);                   \
+    } while (0)
+
 #define CLOCK_ONCE()                   \
     do {                               \
         IO_PIO_DATA_A = 0;             \
         IO_PIO_DATA_A = 1 << IO_CLOCK; \
     } while (0)
+
+/*
+ * 16 t-states, 1.6us
+ */
+#define NOP()       \
+    __asm__("NOP\n" \
+            "NOP\n" \
+            "NOP\n" \
+            "NOP\n")
+
+
 #define GET_DATA(port) (IO_PIO_DATA_A & (1 << port))
 
 #define IO_PIO_DISABLE_INT 0x03
@@ -34,24 +55,15 @@ __sfr __at(0xd2) IO_PIO_CTRL_A;
 
 uint16_t PORT1_bits = 0; // nothing
 uint16_t PORT2_bits = 0; // nothing
-int8_t MOUSE_y = 0; // nothing
-int8_t MOUSE_x = 0; // nothing
+int8_t MOUSE_y      = 0; // nothing
+int8_t MOUSE_x      = 0; // nothing
 
 zos_err_t controller_flush(void)
 {
-    // read the controller + mouse to "initialize" the mouse, if found
-    controller_read_port(SNES_PORT2);
-
-    // pulse the snes mouse 32 times to set initial sensitivity
-    for(uint8_t i = 0; i < 31; i++) {
-        IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH);
-        IO_PIO_DATA_A = 0;
-    }
-
-    PORT1_bits   = 0;
-    PORT2_bits   = 0;
-    MOUSE_y = 0;
-    MOUSE_x = 0;
+    PORT1_bits = 0;
+    PORT2_bits = 0;
+    MOUSE_y    = 0;
+    MOUSE_x    = 0;
 
     return ERR_SUCCESS;
 }
@@ -89,12 +101,8 @@ uint16_t controller_read(void)
 
 uint16_t controller_read_port(uint8_t port)
 {
-    /**
-     * Generate a pulse on the LATCH pin, CLOCK must remain high during this process
-     * Thanks to the preconfigured registers, this takes 24 T-States (2.4 microseconds @ 10MHz)
-     */
-    IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH);
-    IO_PIO_DATA_A = (1 << IO_CLOCK);
+    LATCH_ONCE();
+
     // Now, the DATA lines contain the first button (B) state.
 
     PORT1_bits = GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0;
@@ -103,7 +111,7 @@ uint16_t controller_read_port(uint8_t port)
     for (uint8_t i = 0; i < 15; ++i) {
         PORT1_bits = PORT1_bits >> 1;
         PORT2_bits = PORT2_bits >> 1;
-        CLOCK_ONCE();                                  // pulse the clock
+        CLOCK_ONCE();                                       // pulse the clock
         PORT1_bits |= GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0; // OR the current button
         PORT2_bits |= GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0; // OR the current button
     }
@@ -119,30 +127,49 @@ uint8_t controller_read_mouse(uint8_t port)
 {
     // // small delay, to ensure proper read
     // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
-    // __asm__("nop\n" // 4 cycles
-    //         "nop\n" // 4 cycles
-    //         "nop\n" // 4 cycles
-    //         "nop\n" // 4 cycles
-    // );
-    MOUSE_x = 0;
-    MOUSE_y = 0;
+    // NOP();
+    // NOP();
+    // NOP();
+    // NOP();
+    // NOP();
+    // NOP();
+    // NOP();
+    // NOP();
+
+    uint8_t i;
+    uint8_t raw = 0;
 
     // third (Y) byte
-    for (uint8_t i = 0; i < 8; ++i) {
-        MOUSE_y = MOUSE_y << 1;
+    for (i = 0; i < 8; ++i) {
+        raw = raw << 1;
         CLOCK_ONCE();
-        MOUSE_y |= GET_DATA(port) == 0 ? 1 : 0;
+        raw |= GET_DATA(port) == 0 ? 1 : 0;
+        NOP();
+        NOP();
+        NOP();
+        NOP();
     }
-    if(MOUSE_y & 0x80) MOUSE_y = -(MOUSE_y & 0x7F);
-
+    if (raw & 0x80) {
+        MOUSE_y = -(raw & 0x7F);
+    } else {
+        MOUSE_y = raw;
+    }
 
     // fourth (X) byte
-    for (uint8_t i = 0; i < 8; ++i) {
-        MOUSE_x = MOUSE_x << 1;
+    for (i = 0; i < 8; ++i) {
+        raw = raw << 1;
         CLOCK_ONCE();
-        MOUSE_x |= GET_DATA(port) == 0 ? 1 : 0;
+        raw |= GET_DATA(port) == 0 ? 1 : 0;
+        NOP();
+        NOP();
+        NOP();
+        NOP();
     }
-    if(MOUSE_x & 0x80) MOUSE_x = -(MOUSE_x & 0x7F);
+    if (raw & 0x80) {
+        MOUSE_x = -(MOUSE_x & 0x7F);
+    } else {
+        MOUSE_x = raw;
+    }
 
     if (MOUSE_x != 0 && MOUSE_y != 0)
         return 0x03;
@@ -153,12 +180,53 @@ uint8_t controller_read_mouse(uint8_t port)
     return 0;
 }
 
-int8_t controller_get_mousey(void) {
+int8_t controller_get_mousey(void)
+{
     return MOUSE_y;
 }
 
-int8_t controller_get_mousex(void) {
+int8_t controller_get_mousex(void)
+{
     return MOUSE_x;
+}
+
+uint8_t controller_set_mouse_sensitivity(uint8_t port, MouseSensitivity s)
+{
+    (void) port; // unreferenced
+    (void) s;    // unreferenced
+
+    // read the controller + mouse to "initialize" the mouse, if found
+    LATCH_ONCE();
+
+    uint8_t i;
+    for (i = 0; i < 15; ++i) {
+        CLOCK_ONCE();
+        NOP();
+    }
+
+    // delay ... ~1ms ((1.6us * 2) * 255 = 816us?
+    // SDCC doesn't like (i=0;i<255;i++)
+    // src/controller.c:191: warning 158: overflow in implicit constant conversion
+    for(i = 255; i > 0; --i) {
+        NOP();
+        NOP();
+        NOP();
+        NOP();
+    }
+
+    // pulse the snes mouse 31 times to set initial sensitivity
+    for (i = 0; i < 31; i++) {
+        IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH);
+        NOP();
+        NOP();
+        IO_PIO_DATA_A = 0;
+        NOP();
+        NOP();
+        NOP();
+        NOP();
+    }
+
+    return 0; // the current sensitivity reading?
 }
 
 uint8_t controller_is(uint8_t port, ControllerType type)
@@ -167,9 +235,7 @@ uint8_t controller_is(uint8_t port, ControllerType type)
     uint16_t bits = controller_read_port(port);
 
     switch (type) {
-        case SNES_PAD:
-            printf("controller_is(%d, %d): %04x\n", port, type, bits);
-            return (bits & 0xF000) == 0;
+        case SNES_PAD: printf("controller_is(%d, %d): %04x\n", port, type, bits); return (bits & 0xF000) == 0;
         case SNES_MOUSE:
             controller_read_mouse(port); // read and discard the X/Y
             // second read, to get bytes 5-6
@@ -179,9 +245,9 @@ uint8_t controller_is(uint8_t port, ControllerType type)
             uint8_t brand = controller_get_mousey();
 
             printf("controller_is(%d, %d): %04x Brand: %02x \"", port, type, bits, brand);
-            if(brand == 0x00) {
+            if (brand == 0x00) {
                 printf("Nintendo");
-            } else if(brand == 0x80) {
+            } else if (brand == 0x80) {
                 printf("Hyperkin");
             } else {
                 printf("UNKNOWN");

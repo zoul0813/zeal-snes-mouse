@@ -28,6 +28,21 @@ int main(void)
 {
     zos_err_t err;
 
+    // // third (Y) byte
+    // int8_t MOUSE_y = 0;
+    // uint8_t a = 0;
+    // printf("MOUSE_y: ");
+    // for (uint8_t i = 0; i < 8; ++i) {
+    //     MOUSE_y = MOUSE_y << 1;
+    //     a = i % 2 == 0 ? 1 : 0;
+    //     MOUSE_y |= a;
+    //     printf("%d", a);
+    // }
+    // if(MOUSE_y & 0x80) MOUSE_y = -(MOUSE_y & 0x7F);
+    // printf("  %02x %d\n", MOUSE_y & 0xFF, MOUSE_y);
+    // exit(1);
+
+
     printf("snes mouse test\n");
 
     err = controller_init();
@@ -49,10 +64,14 @@ int main(void)
         mousePort = SNES_PORT2;
     }
 
+    if(mousePort != 0xFF) {
+        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
+    }
+
     uint16_t input1 = 0, input2 = 0;
     uint16_t prev_input1 = 0, prev_input2 = 0;
     uint8_t mouse = 0, prev_mouse = 0;
-    uint8_t right = 0, left  = 0, speed = 0;
+    uint8_t right = 0, left  = 0, sensitivity = 0;
     int8_t y = 0, x = 0;
 
     while (1) {
@@ -62,6 +81,7 @@ int main(void)
 
         controller_read();
         if (mousePort != 0xFF) {
+            msleep(1);
             mouse = controller_read_mouse(mousePort);
         }
         input1 = controller_get(SNES_PORT1);
@@ -104,19 +124,19 @@ int main(void)
         if ((mousePort != 0xFF) && ((mouse != prev_mouse) || (input2 != prev_input2))) {
             right = (MOUSE2_R != 0);
             left  = (MOUSE2_L != 0);
-            // speed = MOUSE2_SPD;
+            sensitivity = MOUSE2_SPD;
             y = controller_get_mousey();
             x = controller_get_mousex();
             printf("mouse: %02x %02x %02x %04x ",
                 mouse & 0xFF, // %02x
                 y & 0xFF,     // %02x
                 x & 0xFF,     // %02x
-                input2          // %04x
+                input2        // %04x
             );
-            printf("L: %03d R: %03d Y: %04d X: %04d \n",
+            printf("L: %03d R: %03d S: %03d Y: %04d X: %04d \n",
                 left,           // %03d
                 right,          // %03d
-                // speed,          // %03d
+                sensitivity,          // %03d
                 y,
                 x
             );
