@@ -166,7 +166,7 @@ uint8_t controller_read_mouse(uint8_t port)
         NOP();
     }
     if (raw & 0x80) {
-        MOUSE_x = -(MOUSE_x & 0x7F);
+        MOUSE_x = -(raw & 0x7F);
     } else {
         MOUSE_x = raw;
     }
