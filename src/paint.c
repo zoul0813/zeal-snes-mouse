@@ -133,19 +133,8 @@ int paint(void)
         prev_input1 = input1;
         prev_input2 = input2;
 
-        uint8_t diff = ((uint8_t)mx & 0x7F) >> 2;
-        if (mx < 0) {
-            x -= diff;
-        } else if(mx > 0) {
-            x += diff;
-        }
-
-        diff = (my & 0x7F) >> 2;
-        if (my < 0) {
-            y -=  diff;
-        } else if(my > 0) {
-            y +=  diff;
-        }
+        x += mx / 4;
+        y += my / 4;
 
 
         // screen boundaries

@@ -64,15 +64,21 @@ int main(void)
         mousePort = SNES_PORT2;
     }
 
-    if(mousePort != 0xFF) {
-        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
-    }
-
     uint16_t input1 = 0, input2 = 0;
     uint16_t prev_input1 = 0, prev_input2 = 0;
     uint8_t mouse = 0, prev_mouse = 0;
     uint8_t right = 0, left  = 0, sensitivity = 0;
     int8_t y = 0, x = 0;
+
+    if(mousePort != 0xFF) {
+        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
+        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
+        while(1) {
+            input2 = controller_read_port(mousePort);
+            uint8_t s = MOUSE2_SPD;
+            if(s == MOUSE_LOW) break;
+        }
+    }
 
     while (1) {
         // wait on vblank to simulate actual read speed for "distance"

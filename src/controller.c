@@ -115,10 +115,10 @@ uint16_t controller_read_port(uint8_t port)
         PORT1_bits = PORT1_bits >> 1;
         PORT2_bits = PORT2_bits >> 1;
         CLOCK_ONCE();                                       // pulse the clock
-        NOP(); NOP();
+        // NOP(); NOP();
         PORT1_bits |= GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0; // OR the current button
         PORT2_bits |= GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0; // OR the current button
-        NOP(); NOP();
+        // NOP(); NOP();
     }
 
     switch (port) {
@@ -134,6 +134,7 @@ uint8_t controller_read_mouse(uint8_t port)
     // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
     // NOP();
     NOP(); NOP(); NOP(); NOP();
+    NOP(); NOP(); NOP(); NOP();
 
     uint8_t i;
     uint8_t raw = 0;
@@ -143,8 +144,10 @@ uint8_t controller_read_mouse(uint8_t port)
         raw = raw << 1;
         CLOCK_ONCE();
         NOP(); NOP();
-        raw |= GET_DATA(port) == 0 ? 1 : 0;
         NOP(); NOP();
+        NOP(); NOP();
+        NOP(); NOP();
+        raw |= GET_DATA(port) == 0 ? 1 : 0;
     }
     if (raw & 0x80) {
         MOUSE_y = -(raw & 0x7F);
@@ -159,7 +162,6 @@ uint8_t controller_read_mouse(uint8_t port)
         CLOCK_ONCE();
         NOP(); NOP();
         raw |= GET_DATA(port) == 0 ? 1 : 0;
-        NOP(); NOP();
     }
     if (raw & 0x80) {
         MOUSE_x = -(raw & 0x7F);
@@ -191,7 +193,6 @@ uint8_t controller_set_mouse_sensitivity(uint8_t port, MouseSensitivity s)
     (void) port; // unreferenced
     (void) s;    // unreferenced
 
-    // read the controller + mouse to "initialize" the mouse, if found
     LATCH_ONCE();
 
     uint8_t i;
@@ -210,17 +211,24 @@ uint8_t controller_set_mouse_sensitivity(uint8_t port, MouseSensitivity s)
         NOP();
     }
 
-    // pulse the snes mouse 31 times to set initial sensitivity
+    /**
+     * A special sequence is used to rotate between the 3 modes. First, a normal 12us latch pulse is applied.
+     * Next, the first 16 bits are read using normal button timings. Shortly after (about 1ms), 31 short latch
+     * pulses (3.4uS) are sent, with the clock going low for 700ns during each latch pulse.
+     *
+     * For selecting a specific sensitivity, simply execute the special sequence until bits 11 and 12 are as desired.
+     */
+
     for (i = 0; i < 31; i++) {
-        IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH);
+        IO_PIO_DATA_A = (1 << IO_CLOCK) | (1 << IO_LATCH); // latch set
         NOP();
+        IO_PIO_DATA_A = (1 << IO_LATCH);                   // clock release
         NOP();
         IO_PIO_DATA_A = 0;
         NOP();
-        NOP();
-        NOP();
-        NOP();
     }
+
+    IO_PIO_DATA_A = 1 << IO_CLOCK; // clock set
 
     return 0; // the current sensitivity reading?
 }
