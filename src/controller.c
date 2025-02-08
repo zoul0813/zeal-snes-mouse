@@ -45,6 +45,11 @@ __sfr __at(0xd2) IO_PIO_CTRL_A;
             "NOP\n" \
             "NOP\n")
 
+#define NOP_WAIT(times) \
+    for(uint8_t mouse_wait = times; mouse_wait > 0; mouse_wait--) { \
+        __asm__("NOP\n"); \
+    }
+
 
 #define GET_DATA(port) (IO_PIO_DATA_A & (1 << port))
 
@@ -132,9 +137,7 @@ uint8_t controller_read_mouse(uint8_t port)
 {
     // // small delay, to ensure proper read
     // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
-    // NOP();
-    NOP(); NOP(); NOP(); NOP();
-    NOP(); NOP(); NOP(); NOP();
+    NOP_WAIT(3);
 
     uint8_t i;
     uint8_t raw = 0;
@@ -143,10 +146,7 @@ uint8_t controller_read_mouse(uint8_t port)
     for (i = 0; i < 8; ++i) {
         raw = raw << 1;
         CLOCK_ONCE();
-        NOP(); NOP();
-        NOP(); NOP();
-        NOP(); NOP();
-        NOP(); NOP();
+        NOP_WAIT(3);
         raw |= GET_DATA(port) == 0 ? 1 : 0;
     }
     if (raw & 0x80) {
@@ -205,10 +205,7 @@ uint8_t controller_set_mouse_sensitivity(uint8_t port, MouseSensitivity s)
     // SDCC doesn't like (i=0;i<255;i++)
     // src/controller.c:191: warning 158: overflow in implicit constant conversion
     for(i = 255; i > 0; --i) {
-        NOP();
-        NOP();
-        NOP();
-        NOP();
+        NOP_WAIT(2);
     }
 
     /**
