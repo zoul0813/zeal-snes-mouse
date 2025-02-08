@@ -116,7 +116,7 @@ int paint(void)
         controller_read_mouse(SNES_PORT2);
         input2 = controller_get(SNES_PORT2);
         mx = controller_get_mousex();
-        my = controller_get_mousex();
+        my = controller_get_mousey();
 
         // left/right button clicks
         if(MOUSE2_L) {
@@ -133,24 +133,26 @@ int paint(void)
         prev_input1 = input1;
         prev_input2 = input2;
 
-        uint8_t diff = (mx & 0x7F) >> 4; // 1; //-pak[1];
+        uint8_t diff = ((uint8_t)mx & 0x7F) >> 2;
         if (mx < 0) {
             x -= diff;
         } else if(mx > 0) {
-            x += diff; // pak[1];
+            x += diff;
         }
 
+        diff = (my & 0x7F) >> 2;
+        if (my < 0) {
+            y -=  diff;
+        } else if(my > 0) {
+            y +=  diff;
+        }
+
+
+        // screen boundaries
         if (x <= 0) {
             x = 0;
         } else if (x > SCREEN_WIDTH - 16) {
             x = SCREEN_WIDTH - 16;
-        }
-
-        diff = (my & 0x7F) >> 4; // 1; //-pak[2];
-        if (my < 0) {
-            y -= diff; // pak[2];
-        } else if(my > 0) {
-            y += diff;
         }
 
         if (y <= 0) {

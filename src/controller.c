@@ -27,6 +27,9 @@ __sfr __at(0xd2) IO_PIO_CTRL_A;
         IO_PIO_DATA_A = (1 << IO_CLOCK);                   \
     } while (0)
 
+/**
+ * Pulse the clock
+ */
 #define CLOCK_ONCE()                   \
     do {                               \
         IO_PIO_DATA_A = 0;             \
@@ -112,8 +115,10 @@ uint16_t controller_read_port(uint8_t port)
         PORT1_bits = PORT1_bits >> 1;
         PORT2_bits = PORT2_bits >> 1;
         CLOCK_ONCE();                                       // pulse the clock
+        NOP(); NOP();
         PORT1_bits |= GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0; // OR the current button
         PORT2_bits |= GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0; // OR the current button
+        NOP(); NOP();
     }
 
     switch (port) {
@@ -128,13 +133,7 @@ uint8_t controller_read_mouse(uint8_t port)
     // // small delay, to ensure proper read
     // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
     // NOP();
-    // NOP();
-    // NOP();
-    // NOP();
-    // NOP();
-    // NOP();
-    // NOP();
-    // NOP();
+    NOP(); NOP(); NOP(); NOP();
 
     uint8_t i;
     uint8_t raw = 0;
@@ -143,11 +142,9 @@ uint8_t controller_read_mouse(uint8_t port)
     for (i = 0; i < 8; ++i) {
         raw = raw << 1;
         CLOCK_ONCE();
+        NOP(); NOP();
         raw |= GET_DATA(port) == 0 ? 1 : 0;
-        NOP();
-        NOP();
-        NOP();
-        NOP();
+        NOP(); NOP();
     }
     if (raw & 0x80) {
         MOUSE_y = -(raw & 0x7F);
@@ -155,15 +152,14 @@ uint8_t controller_read_mouse(uint8_t port)
         MOUSE_y = raw;
     }
 
+    raw = 0;
     // fourth (X) byte
     for (i = 0; i < 8; ++i) {
         raw = raw << 1;
         CLOCK_ONCE();
+        NOP(); NOP();
         raw |= GET_DATA(port) == 0 ? 1 : 0;
-        NOP();
-        NOP();
-        NOP();
-        NOP();
+        NOP(); NOP();
     }
     if (raw & 0x80) {
         MOUSE_x = -(raw & 0x7F);

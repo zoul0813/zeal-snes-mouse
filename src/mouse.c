@@ -81,7 +81,6 @@ int main(void)
 
         controller_read();
         if (mousePort != 0xFF) {
-            msleep(1);
             mouse = controller_read_mouse(mousePort);
         }
         input1 = controller_get(SNES_PORT1);
@@ -127,8 +126,8 @@ int main(void)
             sensitivity = MOUSE2_SPD;
             y = controller_get_mousey();
             x = controller_get_mousex();
-            printf("mouse: %02x %02x %02x %04x ",
-                mouse & 0xFF, // %02x
+            printf("mouse: %02x %02x %04x ",
+                // mouse & 0xFF, // %02x
                 y & 0xFF,     // %02x
                 x & 0xFF,     // %02x
                 input2        // %04x
