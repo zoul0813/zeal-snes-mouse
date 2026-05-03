@@ -120,10 +120,8 @@ uint16_t controller_read_port(uint8_t port)
         PORT1_bits = PORT1_bits >> 1;
         PORT2_bits = PORT2_bits >> 1;
         CLOCK_ONCE();                                       // pulse the clock
-        // NOP(); NOP();
         PORT1_bits |= GET_DATA(IO_DATA1) == 0 ? 0x8000 : 0; // OR the current button
         PORT2_bits |= GET_DATA(IO_DATA2) == 0 ? 0x8000 : 0; // OR the current button
-        // NOP(); NOP();
     }
 
     switch (port) {
@@ -133,48 +131,50 @@ uint16_t controller_read_port(uint8_t port)
     return 0;
 }
 
+static void mouse_bit_delay(void) {
+    NOP_WAIT(16);
+}
+
+static int8_t decode_mouse_axis(uint8_t raw) {
+    uint8_t mag = raw & 0x7f;
+    if(mag == 0) return 0;
+
+    return (raw & 0x80) ? -(int8_t)mag : (int8_t)mag;
+}
+
+static uint8_t read_mouse_byte(uint8_t port) {
+    uint8_t raw = 0;
+    for(uint8_t i = 0; i < 8; i++) {
+        raw <<= 1;
+        CLOCK_ONCE();
+        mouse_bit_delay();
+        raw |= GET_DATA(port) == 0 ? 1 : 0;
+    }
+    return raw;
+}
+
 uint8_t controller_read_mouse(uint8_t port)
 {
-    // // small delay, to ensure proper read
-    // // https://www.nesdev.org/wiki/Super_NES_Mouse#cite_note-2
-    NOP_WAIT(3);
+    uint8_t raw_y;
+    uint8_t raw_x;
 
-    uint8_t i;
-    uint8_t raw = 0;
+    mouse_bit_delay();
+    mouse_bit_delay();
+    mouse_bit_delay();
+    mouse_bit_delay();
 
-    // third (Y) byte
-    for (i = 0; i < 8; ++i) {
-        raw = raw << 1;
-        CLOCK_ONCE();
-        NOP_WAIT(3);
-        raw |= GET_DATA(port) == 0 ? 1 : 0;
-    }
-    if (raw & 0x80) {
-        MOUSE_y = -(raw & 0x7F);
-    } else {
-        MOUSE_y = raw;
-    }
+    raw_y = read_mouse_byte(port);
 
-    raw = 0;
-    // fourth (X) byte
-    for (i = 0; i < 8; ++i) {
-        raw = raw << 1;
-        CLOCK_ONCE();
-        NOP(); NOP();
-        raw |= GET_DATA(port) == 0 ? 1 : 0;
-    }
-    if (raw & 0x80) {
-        MOUSE_x = -(raw & 0x7F);
-    } else {
-        MOUSE_x = raw;
-    }
+    mouse_bit_delay();
 
-    if (MOUSE_x != 0 && MOUSE_y != 0)
-        return 0x03;
-    if (MOUSE_y != 0)
-        return 0x01;
-    if (MOUSE_x != 0)
-        return 0x02;
+    raw_x = read_mouse_byte(port);
+
+    MOUSE_y = decode_mouse_axis(raw_y);
+    MOUSE_x = decode_mouse_axis(raw_x);
+
+    if(MOUSE_x != 0 && MOUSE_y != 0) return 0x03;
+    if(MOUSE_y != 0) return 0x01;
+    if(MOUSE_x != 0) return 0x02;
     return 0;
 }
 

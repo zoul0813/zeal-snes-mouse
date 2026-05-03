@@ -133,8 +133,8 @@ int paint(void)
         prev_input1 = input1;
         prev_input2 = input2;
 
-        x += mx / 4;
-        y += my / 4;
+        x += mx;
+        y += my;
 
 
         // screen boundaries
