@@ -32,16 +32,20 @@ project(${target_name} C ASM)
 zos_use(zvb)
 find_package(ZVB_SDK REQUIRED)
 
+zos_use(zgdk)
+find_package(ZGDK REQUIRED)
+
 # -------------------------------
 # Executable
 # -------------------------------
 add_executable(${target_name}
   src/mouse.c
-  src/controller.c
+#   src/controller.c
   src/paint.c
 )
 
 target_link_libraries(${target_name} PUBLIC zvb)
+target_link_libraries(${target_name} PUBLIC zgdk)
 
 # -------------------------------
 # Convert to binary

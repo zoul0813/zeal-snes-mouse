@@ -13,7 +13,9 @@
 #include <zos_video.h>
 #include <zvb_gfx.h>
 
-#include "controller.h"
+#include "zgdk/input/button_map.h"
+#include "zgdk/input/controller.h"
+#include "mouse.h"
 
 #define DEBUG_MODE 0
 

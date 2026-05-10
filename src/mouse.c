@@ -4,9 +4,44 @@
 #include <zos_video.h>
 #include <zvb_gfx.h>
 // #include <zgdk.h>
-#include "controller.h"
+#include "zgdk/input/button_map.h"
+#include "zgdk/input/controller.h"
+#include "mouse.h"
 
 int paint(void);
+
+static uint8_t is_controller(uint8_t port, ControllerType type)
+{
+    controller_flush();
+    uint16_t bits = controller_read_port(port);
+
+    switch (type) {
+        case SNES_PAD: {
+            printf("controller_is(%d, %d): %04x\n", port, type, bits);
+            return (bits & 0xF000) == 0;
+        }
+        case SNES_MOUSE:
+            controller_read_mouse(port); // read and discard the X/Y
+            // second read, to get bytes 5-6
+            // SNES should report 0xFFFF
+            // Hyperkin should report 0x8000
+            controller_read_mouse(port);
+            uint8_t brand = controller_get_mousey();
+
+            printf("controller_is(%d, %d): %04x Brand: %02x \"", port, type, bits, brand);
+            if (brand == 0x00) {
+                printf("Nintendo");
+            } else if (brand == 0x80) {
+                printf("Hyperkin");
+            } else {
+                printf("UNKNOWN");
+            }
+            printf("\"\n");
+            return (bits & 0xF000) == MOUSE_ID;
+        default: return 0;
+    }
+}
+
 
 void deinit(void)
 {
@@ -54,12 +89,12 @@ int main(void)
 
     uint8_t mousePort = 0xFF;
 
-    if (controller_is(SNES_PORT1, SNES_MOUSE)) {
+    if (is_controller(SNES_PORT1, SNES_MOUSE)) {
         printf("SNES Mouse Detected: %d\n", SNES_PORT1);
         mousePort = SNES_PORT1;
     }
 
-    if (controller_is(SNES_PORT2, SNES_MOUSE)) {
+    if (is_controller(SNES_PORT2, SNES_MOUSE)) {
         printf("SNES Mouse Detected: %d\n", SNES_PORT2);
         mousePort = SNES_PORT2;
     }
@@ -148,7 +183,7 @@ int main(void)
         }
 
         if ((mousePort != SNES_PORT1)) {
-            if(START1) goto exit_program;
+            if(START1 && SELECT1) goto exit_program;
             if(BUTTON1_Y) {
                 paint();
                 ioctl(DEV_STDOUT, CMD_RESET_SCREEN, NULL);
@@ -156,7 +191,7 @@ int main(void)
             }
         }
         if ((mousePort == SNES_PORT1)) {
-            if(START2) goto exit_program;
+            if(START2 && SELECT2) goto exit_program;
         }
 
         prev_input1 = input1;
