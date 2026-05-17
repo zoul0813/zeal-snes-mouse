@@ -106,13 +106,8 @@ int main(void)
     int8_t y = 0, x = 0;
 
     if(mousePort != 0xFF) {
-        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
-        controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
-        while(1) {
-            input2 = controller_read_port(mousePort);
-            uint8_t s = MOUSE2_SPD;
-            if(s == MOUSE_LOW) break;
-        }
+        uint8_t s = controller_set_mouse_sensitivity(mousePort, MOUSE_MEDIUM);
+        printf("mouse sensitivity result: %u\n", s);
     }
 
     while (1) {
@@ -130,9 +125,21 @@ int main(void)
         if ((mousePort != SNES_PORT1) && (input1 != prev_input1)) {
             printf("P1: %04x ", input1);
             if(LEFT1) printf("Left ");
-            if(RIGHT1) printf("Right ");
-            if(UP1) printf("Up ");
-            if(DOWN1) printf("Down ");
+            if(RIGHT1) {
+                printf("Right ");
+                uint8_t s = controller_set_mouse_sensitivity(mousePort, MOUSE_HIGH);
+                printf("mouse sensitivity result: %u\n", s);
+            }
+            if(UP1) {
+                printf("Up ");
+                uint8_t s = controller_set_mouse_sensitivity(mousePort, MOUSE_MEDIUM);
+                printf("mouse sensitivity result: %u\n", s);
+            }
+            if(DOWN1) {
+                printf("Down ");
+                uint8_t s = controller_set_mouse_sensitivity(mousePort, MOUSE_LOW);
+                printf("mouse sensitivity result: %u\n", s);
+            }
             if(BUTTON1_A) printf("A ");
             if(BUTTON1_B) printf("B ");
             if(BUTTON1_X) printf("X ");
